@@ -224,6 +224,27 @@ bool SteamNetworkingManager::joinHost(uint64 hostID) {
     }
 }
 
+void SteamNetworkingManager::setMessageHandlerDependencies(boost::asio::io_context& io_context, std::map<HSteamNetConnection, std::shared_ptr<TCPClient>>& clientMap, std::mutex& clientMutex, std::unique_ptr<TCPServer>& server, int& localPort) {
+    io_context_ = &io_context;
+    clientMap_ = &clientMap;
+    clientMutex_ = &clientMutex;
+    server_ = &server;
+    localPort_ = &localPort;
+    messageHandler_ = new SteamMessageHandler(io_context, m_pInterface, connections, clientMap, clientMutex, connectionsMutex, server, g_isHost, localPort);
+}
+
+void SteamNetworkingManager::startMessageHandler() {
+    if (messageHandler_) {
+        messageHandler_->start();
+    }
+}
+
+void SteamNetworkingManager::stopMessageHandler() {
+    if (messageHandler_) {
+        messageHandler_->stop();
+    }
+}
+
 void SteamNetworkingManager::update() {
     std::lock_guard<std::mutex> lock(connectionsMutex);
     for (auto& pair : userMap) {
