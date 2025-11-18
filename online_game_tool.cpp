@@ -48,6 +48,7 @@ int g_currentVirtualPort = 0;
 std::vector<HSteamNetConnection> connections;
 std::map<HSteamNetConnection, TCPClient*> clientMap;
 std::mutex clientMutex;
+std::mutex connectionsMutex;  // Add mutex for connections
 int localPort = 0;
 bool g_isHost = false;
 bool g_isClient = false;
@@ -73,7 +74,10 @@ void OnSteamNetConnectionStatusChanged(SteamNetConnectionStatusChangedCallback_t
     {
         // Incoming connection, accept it
         SteamNetworkingSockets()->AcceptConnection(pInfo->m_hConn);
-        connections.push_back(pInfo->m_hConn);
+        {
+            std::lock_guard<std::mutex> lockConn(connectionsMutex);
+            connections.push_back(pInfo->m_hConn);
+        }
         g_hConnection = pInfo->m_hConn; // Keep for backward compatibility if needed
         g_isConnected = true;
         std::cout << "Accepted incoming connection from " << pInfo->m_info.m_identityRemote.GetSteamID().ConvertToUint64() << std::endl;
@@ -115,12 +119,15 @@ void OnSteamNetConnectionStatusChanged(SteamNetConnectionStatusChangedCallback_t
         g_isConnected = false;
         g_hConnection = k_HSteamNetConnection_Invalid;
         // Remove from connections
-        auto it = connections.begin();
-        while (it != connections.end()) {
-            if (*it == pInfo->m_hConn) {
-                it = connections.erase(it);
-            } else {
-                ++it;
+        {
+            std::lock_guard<std::mutex> lockConn(connectionsMutex);
+            auto it = connections.begin();
+            while (it != connections.end()) {
+                if (*it == pInfo->m_hConn) {
+                    it = connections.erase(it);
+                } else {
+                    ++it;
+                }
             }
         }
         // Remove from userMap
@@ -198,7 +205,7 @@ int main() {
     boost::asio::io_context io_context;
 
     // Create Steam Message Handler
-    SteamMessageHandler messageHandler(io_context, m_pInterface, connections, clientMap, clientMutex, server, g_isHost, localPort);
+    SteamMessageHandler messageHandler(io_context, m_pInterface, connections, clientMap, clientMutex, connectionsMutex, server, g_isHost, localPort);
 
     // Initialize GLFW
     if (!glfwInit()) {
@@ -344,6 +351,7 @@ int main() {
             }
             {
                 std::lock_guard<std::mutex> lock(clientMutex);
+                std::lock_guard<std::mutex> lockConn(connectionsMutex);
                 ImGui::Text("连接的好友: %d", (int)connections.size());
                 ImGui::Text("活跃的TCP客户端: %d", (int)clientMap.size());
             }

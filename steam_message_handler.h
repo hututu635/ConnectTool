@@ -13,7 +13,7 @@
 
 class SteamMessageHandler {
 public:
-    SteamMessageHandler(boost::asio::io_context& io_context, ISteamNetworkingSockets* interface, std::vector<HSteamNetConnection>& connections, std::map<HSteamNetConnection, TCPClient*>& clientMap, std::mutex& clientMutex, std::unique_ptr<TCPServer>& server, bool& g_isHost, int& localPort);
+    SteamMessageHandler(boost::asio::io_context& io_context, ISteamNetworkingSockets* interface, std::vector<HSteamNetConnection>& connections, std::map<HSteamNetConnection, TCPClient*>& clientMap, std::mutex& clientMutex, std::mutex& connectionsMutex, std::unique_ptr<TCPServer>& server, bool& g_isHost, int& localPort);
     ~SteamMessageHandler();
 
     void start();
@@ -28,6 +28,7 @@ private:
     std::vector<HSteamNetConnection>& connections_;
     std::map<HSteamNetConnection, TCPClient*>& clientMap_;
     std::mutex& clientMutex_;
+    std::mutex& connectionsMutex_;
     std::unique_ptr<TCPServer>& server_;
     bool& g_isHost_;
     int& localPort_;

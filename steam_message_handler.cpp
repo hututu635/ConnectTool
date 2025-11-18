@@ -10,8 +10,8 @@
 const char* CONTROL_PREFIX = "CONTROL:";
 const size_t CONTROL_PREFIX_LEN = 8;
 
-SteamMessageHandler::SteamMessageHandler(boost::asio::io_context& io_context, ISteamNetworkingSockets* interface, std::vector<HSteamNetConnection>& connections, std::map<HSteamNetConnection, TCPClient*>& clientMap, std::mutex& clientMutex, std::unique_ptr<TCPServer>& server, bool& g_isHost, int& localPort)
-    : io_context_(io_context), m_pInterface_(interface), connections_(connections), clientMap_(clientMap), clientMutex_(clientMutex), server_(server), g_isHost_(g_isHost), localPort_(localPort), running_(false) {}
+SteamMessageHandler::SteamMessageHandler(boost::asio::io_context& io_context, ISteamNetworkingSockets* interface, std::vector<HSteamNetConnection>& connections, std::map<HSteamNetConnection, TCPClient*>& clientMap, std::mutex& clientMutex, std::mutex& connectionsMutex, std::unique_ptr<TCPServer>& server, bool& g_isHost, int& localPort)
+    : io_context_(io_context), m_pInterface_(interface), connections_(connections), clientMap_(clientMap), clientMutex_(clientMutex), connectionsMutex_(connectionsMutex), server_(server), g_isHost_(g_isHost), localPort_(localPort), running_(false) {}
 
 SteamMessageHandler::~SteamMessageHandler() {
     stop();
@@ -48,8 +48,13 @@ void SteamMessageHandler::run() {
 }
 
 void SteamMessageHandler::pollMessages() {
+    std::vector<HSteamNetConnection> currentConnections;
+    {
+        std::lock_guard<std::mutex> lockConn(connectionsMutex_);
+        currentConnections = connections_;
+    }
     std::lock_guard<std::mutex> lock(clientMutex_);
-    for (auto conn : connections_) {
+    for (auto conn : currentConnections) {
         ISteamNetworkingMessage* pIncomingMsgs[10];
         int numMsgs = m_pInterface_->ReceiveMessagesOnConnection(conn, pIncomingMsgs, 10);
         for (int i = 0; i < numMsgs; ++i) {
@@ -71,6 +76,11 @@ void SteamMessageHandler::pollMessages() {
                         client->setReceiveCallback([conn, this](const char* data, size_t size) {
                             std::lock_guard<std::mutex> lock(clientMutex_);
                             m_pInterface_->SendMessageToConnection(conn, data, size, k_nSteamNetworkingSend_Reliable, nullptr);
+                        });
+                        client->setDisconnectCallback([conn, this]() {
+                            std::lock_guard<std::mutex> lock(clientMutex_);
+                            m_pInterface_->CloseConnection(conn, 0, nullptr, false);
+                            std::cout << "Closed Steam connection due to TCP client disconnect" << std::endl;
                         });
                         clientMap_[conn] = client;
                         std::cout << "Created TCP Client for connection on first message" << std::endl;

@@ -21,6 +21,7 @@ public:
     void send(const char* data, size_t size);
     void setReceiveCallback(std::function<void(const std::string&)> callback);
     void setReceiveCallback(std::function<void(const char*, size_t)> callback);
+    void setDisconnectCallback(std::function<void()> callback);
 
 private:
     void start_read();
@@ -29,6 +30,7 @@ private:
     std::string host_;
     int port_;
     bool connected_;
+    bool disconnected_;
     boost::asio::io_context io_context_;
     boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work_;
     std::shared_ptr<tcp::socket> socket_;
@@ -36,5 +38,6 @@ private:
     std::mutex socketMutex_;
     std::function<void(const std::string&)> receiveCallback_;
     std::function<void(const char*, size_t)> receiveCallbackBytes_;
+    std::function<void()> disconnectCallback_;
     std::vector<char> buffer_;
 };

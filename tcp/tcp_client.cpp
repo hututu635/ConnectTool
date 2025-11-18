@@ -1,7 +1,7 @@
 #include "tcp_client.h"
 #include <iostream>
 
-TCPClient::TCPClient(const std::string& host, int port) : host_(host), port_(port), connected_(false), socket_(std::make_shared<tcp::socket>(io_context_)), work_(boost::asio::make_work_guard(io_context_)), buffer_(1024) {}
+TCPClient::TCPClient(const std::string& host, int port) : host_(host), port_(port), connected_(false), disconnected_(false), socket_(std::make_shared<tcp::socket>(io_context_)), work_(boost::asio::make_work_guard(io_context_)), buffer_(1024) {}
 
 TCPClient::~TCPClient() { disconnect(); }
 
@@ -26,6 +26,11 @@ bool TCPClient::connect() {
 }
 
 void TCPClient::disconnect() {
+    if (disconnected_) return;
+    disconnected_ = true;
+    if (disconnectCallback_) {
+        disconnectCallback_();
+    }
     connected_ = false;
     io_context_.stop();
     if (clientThread_.joinable()) {
@@ -57,6 +62,10 @@ void TCPClient::setReceiveCallback(std::function<void(const std::string&)> callb
 
 void TCPClient::setReceiveCallback(std::function<void(const char*, size_t)> callback) {
     receiveCallbackBytes_ = callback;
+}
+
+void TCPClient::setDisconnectCallback(std::function<void()> callback) {
+    disconnectCallback_ = callback;
 }
 
 void TCPClient::start_read() {
