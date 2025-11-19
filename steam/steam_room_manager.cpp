@@ -3,7 +3,8 @@
 #include <iostream>
 #include <algorithm>
 
-SteamFriendsCallbacks::SteamFriendsCallbacks(SteamNetworkingManager *manager, SteamRoomManager *roomManager) : manager_(manager), roomManager_(roomManager)
+SteamFriendsCallbacks::SteamFriendsCallbacks(SteamNetworkingManager *manager, SteamRoomManager *roomManager) 
+    : manager_(manager), roomManager_(roomManager)
 {
     std::cout << "SteamFriendsCallbacks constructor called" << std::endl;
 }
@@ -99,10 +100,17 @@ void SteamFriendsCallbacks::OnGameLobbyJoinRequested(GameLobbyJoinRequested_t *p
     }
 }
 
-SteamMatchmakingCallbacks::SteamMatchmakingCallbacks(SteamNetworkingManager *manager, SteamRoomManager *roomManager) : manager_(manager), roomManager_(roomManager) {}
+SteamMatchmakingCallbacks::SteamMatchmakingCallbacks(SteamNetworkingManager *manager, SteamRoomManager *roomManager) 
+    : manager_(manager), roomManager_(roomManager)
+{}
 
-void SteamMatchmakingCallbacks::OnLobbyCreated(LobbyCreated_t *pCallback)
+void SteamMatchmakingCallbacks::OnLobbyCreated(LobbyCreated_t *pCallback, bool bIOFailure)
 {
+    if (bIOFailure)
+    {
+        std::cerr << "Failed to create lobby - IO Failure" << std::endl;
+        return;
+    }
     if (pCallback->m_eResult == k_EResultOK)
     {
         roomManager_->setCurrentLobby(pCallback->m_ulSteamIDLobby);
@@ -120,8 +128,13 @@ void SteamMatchmakingCallbacks::OnLobbyCreated(LobbyCreated_t *pCallback)
     }
 }
 
-void SteamMatchmakingCallbacks::OnLobbyListReceived(LobbyMatchList_t *pCallback)
+void SteamMatchmakingCallbacks::OnLobbyListReceived(LobbyMatchList_t *pCallback, bool bIOFailure)
 {
+    if (bIOFailure)
+    {
+        std::cerr << "Failed to receive lobby list - IO Failure" << std::endl;
+        return;
+    }
     roomManager_->clearLobbies();
     for (uint32 i = 0; i < pCallback->m_nLobbiesMatching; ++i)
     {
@@ -183,7 +196,8 @@ bool SteamRoomManager::createLobby()
         std::cerr << "Failed to create lobby" << std::endl;
         return false;
     }
-    // Call result will be handled by callback
+    // Register the call result
+    steamMatchmakingCallbacks->m_CallResultLobbyCreated.Set(hSteamAPICall, steamMatchmakingCallbacks, &SteamMatchmakingCallbacks::OnLobbyCreated);
     return true;
 }
 
@@ -205,7 +219,8 @@ bool SteamRoomManager::searchLobbies()
         std::cerr << "Failed to request lobby list" << std::endl;
         return false;
     }
-    // Results will be handled by callback
+    // Register the call result
+    steamMatchmakingCallbacks->m_CallResultLobbyMatchList.Set(hSteamAPICall, steamMatchmakingCallbacks, &SteamMatchmakingCallbacks::OnLobbyListReceived);
     return true;
 }
 

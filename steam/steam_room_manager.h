@@ -11,25 +11,31 @@ class SteamFriendsCallbacks
 {
 public:
     SteamFriendsCallbacks(SteamNetworkingManager *manager, SteamRoomManager *roomManager);
-    void OnGameRichPresenceJoinRequested(GameRichPresenceJoinRequested_t *pCallback);
-    void OnGameLobbyJoinRequested(GameLobbyJoinRequested_t *pCallback);
 
 private:
     SteamNetworkingManager *manager_;
     SteamRoomManager *roomManager_;
+    
+    STEAM_CALLBACK(SteamFriendsCallbacks, OnGameRichPresenceJoinRequested, GameRichPresenceJoinRequested_t);
+    STEAM_CALLBACK(SteamFriendsCallbacks, OnGameLobbyJoinRequested, GameLobbyJoinRequested_t);
 };
 
 class SteamMatchmakingCallbacks
 {
 public:
     SteamMatchmakingCallbacks(SteamNetworkingManager *manager, SteamRoomManager *roomManager);
-    void OnLobbyCreated(LobbyCreated_t *pCallback);
-    void OnLobbyListReceived(LobbyMatchList_t *pCallback);
-    void OnLobbyEntered(LobbyEnter_t *pCallback);
+    
+    CCallResult<SteamMatchmakingCallbacks, LobbyCreated_t> m_CallResultLobbyCreated;
+    CCallResult<SteamMatchmakingCallbacks, LobbyMatchList_t> m_CallResultLobbyMatchList;
+    
+    void OnLobbyCreated(LobbyCreated_t *pCallback, bool bIOFailure);
+    void OnLobbyListReceived(LobbyMatchList_t *pCallback, bool bIOFailure);
 
 private:
     SteamNetworkingManager *manager_;
     SteamRoomManager *roomManager_;
+    
+    STEAM_CALLBACK(SteamMatchmakingCallbacks, OnLobbyEntered, LobbyEnter_t);
 };
 
 class SteamRoomManager

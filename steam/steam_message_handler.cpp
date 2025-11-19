@@ -32,9 +32,6 @@ void SteamMessageHandler::run() {
         // Poll networking
         m_pInterface_->RunCallbacks();
 
-        // Update user info (assuming userMap is accessible, but for simplicity, skip or add as param)
-        // Note: userMap update might need to be handled elsewhere or passed
-
         // Receive messages
         pollMessages();
 
