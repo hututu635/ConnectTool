@@ -13,7 +13,6 @@
 #include <boost/asio.hpp>
 #include <memory>
 #include "tcp_server.h"
-#include "tcp/tcp_client.h"
 #include "steam/steam_networking_manager.h"
 #include "steam/steam_room_manager.h"
 #include "steam/steam_utils.h"
@@ -22,8 +21,6 @@ using boost::asio::ip::tcp;
 
 // New variables for multiple connections and TCP clients
 std::vector<HSteamNetConnection> connections;
-std::map<HSteamNetConnection, std::shared_ptr<TCPClient>> clientMap;
-std::mutex clientMutex;
 std::mutex connectionsMutex;  // Add mutex for connections
 int localPort = 0;
 std::unique_ptr<TCPServer> server;
@@ -73,7 +70,7 @@ int main() {
     ImGui_ImplOpenGL3_Init("#version 130");
 
     // Set message handler dependencies
-    steamManager.setMessageHandlerDependencies(io_context, clientMap, clientMutex, server, localPort);
+    steamManager.setMessageHandlerDependencies(io_context, server, localPort);
     steamManager.startMessageHandler();
 
     // Steam Networking variables
@@ -185,10 +182,8 @@ int main() {
                 ImGui::Text("房间内玩家: %d", server->getClientCount() + 1); // +1 for host
             }
             {
-                std::lock_guard<std::mutex> lock(clientMutex);
                 std::lock_guard<std::mutex> lockConn(connectionsMutex);
                 ImGui::Text("连接的好友: %d", (int)steamManager.getConnections().size());
-                ImGui::Text("活跃的TCP客户端: %d", (int)clientMap.size());
             }
             ImGui::Separator();
             ImGui::Text("用户列表:");
@@ -198,7 +193,6 @@ int main() {
                 ImGui::TableSetupColumn("连接类型");
                 ImGui::TableHeadersRow();
                 {
-                    std::lock_guard<std::mutex> lock(clientMutex);
                     for (const auto& pair : steamManager.getUserMap()) {
                         ImGui::TableNextRow();
                         ImGui::TableNextColumn();
@@ -231,14 +225,6 @@ int main() {
     steamManager.stopMessageHandler();
 
     // Cleanup
-    // Cleanup TCP Clients
-    {
-        std::lock_guard<std::mutex> lock(clientMutex);
-        for (auto& pair : clientMap) {
-            pair.second->disconnect();
-        }
-        clientMap.clear();
-    }
     if (server) {
         server->stop();
     }

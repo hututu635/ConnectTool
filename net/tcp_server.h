@@ -10,7 +10,7 @@
 #include <isteamnetworkingsockets.h>
 #include <isteamnetworkingutils.h>
 #include <steamnetworkingtypes.h>
-#include "../multiplex/multiplex_manager.h"
+#include "multiplex_manager.h"
 
 class SteamNetworkingManager;
 

@@ -12,7 +12,6 @@
 #include "steam_message_handler.h"
 
 // Forward declarations
-class TCPClient;
 class TCPServer;
 class SteamNetworkingManager;
 
@@ -50,13 +49,11 @@ public:
     std::unique_ptr<TCPServer>*& getServer() { return server_; }
     int*& getLocalPort() { return localPort_; }
     boost::asio::io_context*& getIOContext() { return io_context_; }
-    std::map<HSteamNetConnection, std::shared_ptr<TCPClient>>*& getClientMap() { return clientMap_; }
-    std::mutex*& getClientMutex() { return clientMutex_; }
     HSteamListenSocket& getListenSock() { return hListenSock; }
     ISteamNetworkingSockets* getInterface() { return m_pInterface; }
     bool& getIsHost() { return g_isHost; }
 
-    void setMessageHandlerDependencies(boost::asio::io_context& io_context, std::map<HSteamNetConnection, std::shared_ptr<TCPClient>>& clientMap, std::mutex& clientMutex, std::unique_ptr<TCPServer>& server, int& localPort);
+    void setMessageHandlerDependencies(boost::asio::io_context& io_context, std::unique_ptr<TCPServer>& server, int& localPort);
 
     // Message handler
     void startMessageHandler();
@@ -93,8 +90,6 @@ private:
 
     // Message handler dependencies
     boost::asio::io_context* io_context_;
-    std::map<HSteamNetConnection, std::shared_ptr<TCPClient>>* clientMap_;
-    std::mutex* clientMutex_;
     std::unique_ptr<TCPServer>* server_;
     int* localPort_;
     SteamMessageHandler* messageHandler_;
