@@ -4,8 +4,6 @@
 
 SteamNetworkingManager *SteamNetworkingManager::instance = nullptr;
 
-SteamNetworkingConfigValue_t g_connectionConfig;
-
 // Static callback function
 void SteamNetworkingManager::OnSteamNetConnectionStatusChanged(SteamNetConnectionStatusChangedCallback_t *pInfo)
 {
@@ -113,13 +111,10 @@ void SteamFriendsCallbacks::OnGameLobbyJoinRequested(GameLobbyJoinRequested_t *p
 
 SteamNetworkingManager::SteamNetworkingManager()
     : m_pInterface(nullptr), hListenSock(k_HSteamListenSocket_Invalid), g_isHost(false), g_isClient(false), g_isConnected(false),
-      g_hConnection(k_HSteamNetConnection_Invalid), g_retryCount(0), g_currentVirtualPort(0),
+      g_hConnection(k_HSteamNetConnection_Invalid),
       io_context_(nullptr), clientMap_(nullptr), clientMutex_(nullptr), server_(nullptr), localPort_(nullptr), messageHandler_(nullptr),
       steamFriendsCallbacks(nullptr), steamMatchmakingCallbacks(nullptr), currentLobby(k_steamIDNil)
 {
-    // Initialize connection config
-    g_connectionConfig[0].SetInt32(k_ESteamNetworkingConfig_P2P_Transport_ICE_Enable, k_nSteamNetworkingConfig_P2P_Transport_ICE_Enable_All);
-    g_connectionConfig[1].SetInt32(k_ESteamNetworkingConfig_P2P_Transport_SDR_Penalty, 300);
     std::cout << "Initialized SteamNetworkingManager" << std::endl;
 }
 
@@ -140,6 +135,74 @@ bool SteamNetworkingManager::initialize()
         std::cerr << "Failed to initialize Steam API" << std::endl;
         return false;
     }
+
+    // 【新增】开启详细日志
+    SteamNetworkingUtils()->SetDebugOutputFunction(k_ESteamNetworkingSocketsDebugOutputType_Msg,
+                                                   [](ESteamNetworkingSocketsDebugOutputType nType, const char *pszMsg)
+                                                   {
+                                                       std::cout << "[SteamNet] " << pszMsg << std::endl;
+                                                   });
+
+    // 1. 允许 P2P (ICE) 直连
+    // 默认情况下 Steam 可能会保守地只允许 LAN，这里设置为 "All" 允许公网 P2P
+    int32 nIceEnable = k_nSteamNetworkingConfig_P2P_Transport_ICE_Enable_Public;
+    SteamNetworkingUtils()->SetConfigValue(
+        k_ESteamNetworkingConfig_P2P_Transport_ICE_Enable,
+        k_ESteamNetworkingConfig_Global, // <--- 关键：作用域选 Global
+        0,                               // Global 时此参数填 0
+        k_ESteamNetworkingConfig_Int32,
+        &nIceEnable);
+
+    // 2. (可选) 极度排斥中继
+    // 如果你铁了心不想走中继，可以给中继路径增加巨大的虚拟延迟惩罚
+    // 这样只有在直连完全打不通（比如防火墙太严格）时，Steam 才会无奈选择中继
+    int32 nSdrPenalty = 10000; // 10000ms 惩罚
+    SteamNetworkingUtils()->SetConfigValue(
+        k_ESteamNetworkingConfig_P2P_Transport_SDR_Penalty,
+        k_ESteamNetworkingConfig_Global,
+        0,
+        k_ESteamNetworkingConfig_Int32,
+        &nSdrPenalty);
+
+    // Allow connections from IPs without authentication
+    int32 allowWithoutAuth = 2;
+    SteamNetworkingUtils()->SetConfigValue(
+        k_ESteamNetworkingConfig_IP_AllowWithoutAuth,
+        k_ESteamNetworkingConfig_Global,
+        0,
+        k_ESteamNetworkingConfig_Int32,
+        &allowWithoutAuth);
+
+    // Manually set STUN server list
+    std::string stunServers = "stun.l.google.com:19302,stun1.l.google.com:19302,stun2.l.google.com:19302,stun3.l.google.com:19302,stun4.l.google.com:19302";
+    SteamNetworkingUtils()->SetConfigValue(
+        k_ESteamNetworkingConfig_P2P_STUN_ServerList,
+        k_ESteamNetworkingConfig_Global,
+        0,
+        k_ESteamNetworkingConfig_String,
+        stunServers.c_str());
+
+    // 打印当前配置的 TURN 和 STUN 服务器列表
+    SteamNetworkingUtils()->GetConfigValueInfo(k_ESteamNetworkingConfig_P2P_TURN_ServerList, nullptr, nullptr);
+    char turnServers[4096] = {};
+    ESteamNetworkingConfigDataType turnType;
+    size_t turnServersSize = sizeof(turnServers);
+    ESteamNetworkingGetConfigValueResult turnResult = SteamNetworkingUtils()->GetConfigValue(
+        k_ESteamNetworkingConfig_P2P_TURN_ServerList,
+        k_ESteamNetworkingConfig_Global, 0,
+        &turnType,
+        turnServers, &turnServersSize);
+    std::cout << "[SteamNet] TURN servers: " << turnServers << std::endl;
+
+    char stunServersBuffer[4096] = {};
+    ESteamNetworkingConfigDataType stunType;
+    size_t stunServersSize = sizeof(stunServersBuffer);
+    ESteamNetworkingGetConfigValueResult stunResult = SteamNetworkingUtils()->GetConfigValue(
+        k_ESteamNetworkingConfig_P2P_STUN_ServerList,
+        k_ESteamNetworkingConfig_Global, 0,
+        &stunType,
+        stunServersBuffer, &stunServersSize);
+    std::cout << "[SteamNet] STUN servers: " << stunServersBuffer << std::endl;
 
     // Create callbacks after Steam API init
     steamFriendsCallbacks = new SteamFriendsCallbacks(this);
@@ -236,7 +299,9 @@ bool SteamNetworkingManager::startHosting()
     {
         return false;
     }
-    hListenSock = m_pInterface->CreateListenSocketP2P(0, 0, g_connectionConfig);
+
+    hListenSock = m_pInterface->CreateListenSocketP2P(0, 0, nullptr);
+
     if (hListenSock != k_HSteamListenSocket_Invalid)
     {
         g_isHost = true;
@@ -268,14 +333,14 @@ bool SteamNetworkingManager::joinHost(uint64 hostID)
     CSteamID hostSteamID(hostID);
     g_isClient = true;
     g_hostSteamID = hostSteamID;
-    g_retryCount = 0;
-    g_currentVirtualPort = 0;
     SteamNetworkingIdentity identity;
     identity.SetSteamID(hostSteamID);
-    g_hConnection = m_pInterface->ConnectP2P(identity, g_currentVirtualPort, 2, g_connectionConfig);
+
+    g_hConnection = m_pInterface->ConnectP2P(identity, 0, 0, nullptr);
+
     if (g_hConnection != k_HSteamNetConnection_Invalid)
     {
-        std::cout << "Attempting to connect to host " << hostSteamID.ConvertToUint64() << " with virtual port " << g_currentVirtualPort << std::endl;
+        std::cout << "Attempting to connect to host " << hostSteamID.ConvertToUint64() << " with virtual port " << 0 << std::endl;
         return true;
     }
     else
@@ -387,25 +452,6 @@ void SteamNetworkingManager::handleConnectionStatusChanged(SteamNetConnectionSta
         }
         userMap.erase(pInfo->m_hConn);
         std::cout << "Connection closed" << std::endl;
-
-        // Retry if client
-        if (g_isClient && !g_isConnected && g_retryCount < MAX_RETRIES)
-        {
-            g_retryCount++;
-            g_currentVirtualPort++;
-            SteamNetworkingIdentity identity;
-            identity.SetSteamID(g_hostSteamID);
-            HSteamNetConnection newConn = m_pInterface->ConnectP2P(identity, g_currentVirtualPort, 2, g_connectionConfig);
-            if (newConn != k_HSteamNetConnection_Invalid)
-            {
-                g_hConnection = newConn;
-                std::cout << "Retrying connection attempt " << g_retryCount << " with virtual port " << g_currentVirtualPort << std::endl;
-            }
-            else
-            {
-                std::cerr << "Failed to initiate retry connection" << std::endl;
-            }
-        }
     }
 }
 

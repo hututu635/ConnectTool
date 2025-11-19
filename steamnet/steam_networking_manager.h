@@ -119,7 +119,6 @@ private:
     std::mutex connectionsMutex;
 
     // Connection config
-    SteamNetworkingConfigValue_t g_connectionConfig[3];
     int g_retryCount;
     const int MAX_RETRIES = 3;
     int g_currentVirtualPort;
