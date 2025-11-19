@@ -21,6 +21,8 @@ std::string MultiplexManager::addClient(std::shared_ptr<tcp::socket> socket) {
     std::lock_guard<std::mutex> lock(mapMutex_);
     std::string id = nanoid::generate(6);
     clientMap_[id] = socket;
+    readBuffers_[id].resize(1024);
+    startAsyncRead(id);
     return id;
 }
 
@@ -31,6 +33,7 @@ void MultiplexManager::removeClient(const std::string& id) {
         it->second->close();
         clientMap_.erase(it);
     }
+    readBuffers_.erase(id);
 }
 
 std::shared_ptr<tcp::socket> MultiplexManager::getClient(const std::string& id) {
@@ -80,8 +83,10 @@ void MultiplexManager::handleTunnelPacket(const char* data, size_t len) {
                 
                 std::lock_guard<std::mutex> lock(mapMutex_);
                 clientMap_[id] = newSocket;
+                readBuffers_[id].resize(1024);
                 socket = newSocket;
                 std::cout << "Successfully created TCP client for id " << id << std::endl;
+                startAsyncRead(id);
             } catch (const std::exception& e) {
                 std::cerr << "Failed to create TCP client for id " << id << ": " << e.what() << std::endl;
                 return;
@@ -99,4 +104,18 @@ void MultiplexManager::handleTunnelPacket(const char* data, size_t len) {
     } else {
         std::cerr << "Unknown packet type " << type << std::endl;
     }
+}
+
+void MultiplexManager::startAsyncRead(const std::string& id) {
+    auto socket = getClient(id);
+    if (!socket || readBuffers_.find(id) == readBuffers_.end()) return;
+    socket->async_read_some(boost::asio::buffer(readBuffers_[id]),
+        [this, id](const boost::system::error_code& ec, std::size_t bytes_transferred) {
+            if (!ec && bytes_transferred > 0) {
+                sendTunnelPacket(id, readBuffers_[id].data(), bytes_transferred, 0);
+                startAsyncRead(id);
+            } else {
+                removeClient(id);
+            }
+        });
 }

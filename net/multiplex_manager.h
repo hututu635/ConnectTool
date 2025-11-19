@@ -34,4 +34,7 @@ private:
     boost::asio::io_context& io_context_;
     bool& isHost_;
     int& localPort_;
+    std::unordered_map<std::string, std::vector<char>> readBuffers_;
+
+    void startAsyncRead(const std::string& id);
 };
