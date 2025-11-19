@@ -35,6 +35,10 @@ int main()
     }
 
     boost::asio::io_context io_context;
+    auto work_guard = boost::asio::make_work_guard(io_context);
+    std::thread io_thread([&io_context]() {
+        io_context.run();
+    });
 
     // Initialize Steam Networking Manager
     SteamNetworkingManager steamManager;
@@ -285,6 +289,15 @@ int main()
     {
         server->stop();
     }
+    
+    // Stop io_context and join thread
+    work_guard.reset();
+    io_context.stop();
+    if (io_thread.joinable())
+    {
+        io_thread.join();
+    }
+    
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
