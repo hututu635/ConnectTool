@@ -10,8 +10,8 @@ find_package(glfw3 CONFIG REQUIRED)
 find_package(Boost REQUIRED COMPONENTS system)
 find_package(Threads REQUIRED)
 
-# ImGui sources (imgui doesn't have CMakeLists.txt by default)
-set(IMGUI_DIR "${CMAKE_SOURCE_DIR}/imgui")
+# ImGui sources (using third_party directory)
+set(IMGUI_DIR "${CMAKE_SOURCE_DIR}/third_party/imgui")
 file(GLOB IMGUI_SOURCES
     "${IMGUI_DIR}/imgui.cpp"
     "${IMGUI_DIR}/imgui_demo.cpp"
@@ -28,10 +28,10 @@ target_include_directories(imgui PUBLIC
 )
 target_link_libraries(imgui PUBLIC glfw OpenGL::GL)
 
-# Add nanoid_cpp
+# Add nanoid_cpp (using third_party directory)
 set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-add_subdirectory(nanoid_cpp)
+add_subdirectory(third_party/nanoid_cpp)
 
 # Steamworks SDK path
 set(STEAMWORKS_DIR "${CMAKE_SOURCE_DIR}/sdk")
@@ -64,16 +64,23 @@ elseif(WIN32)
     message(STATUS "Building TUN module for Windows (Wintun)")
 endif()
 
+# Source files - check if using ConnectTool/ subdirectory or root
+if(EXISTS "${CMAKE_SOURCE_DIR}/ConnectTool/online_game_tool.cpp")
+    set(SOURCE_PREFIX "ConnectTool/")
+else()
+    set(SOURCE_PREFIX "")
+endif()
+
 # Add Online Game Tool executable
 add_executable(OnlineGameTool 
-    ConnectTool/online_game_tool.cpp 
-    ConnectTool/steam/steam_message_handler.cpp 
-    ConnectTool/steam/steam_networking_manager.cpp 
-    ConnectTool/steam/steam_room_manager.cpp 
-    ConnectTool/steam/steam_utils.cpp 
-    ConnectTool/steam/steam_vpn_bridge.cpp
-    ConnectTool/net/tcp_server.cpp 
-    ConnectTool/net/multiplex_manager.cpp
+    ${SOURCE_PREFIX}online_game_tool.cpp 
+    ${SOURCE_PREFIX}steam/steam_message_handler.cpp 
+    ${SOURCE_PREFIX}steam/steam_networking_manager.cpp 
+    ${SOURCE_PREFIX}steam/steam_room_manager.cpp 
+    ${SOURCE_PREFIX}steam/steam_utils.cpp 
+    ${SOURCE_PREFIX}steam/steam_vpn_bridge.cpp
+    ${SOURCE_PREFIX}net/tcp_server.cpp 
+    ${SOURCE_PREFIX}net/multiplex_manager.cpp
     ${TUN_SOURCES}
 )
 
@@ -84,10 +91,10 @@ endif()
 
 # Include directories
 target_include_directories(OnlineGameTool PRIVATE
-    ${CMAKE_SOURCE_DIR}/ConnectTool
-    ${CMAKE_SOURCE_DIR}/ConnectTool/net
-    ${CMAKE_SOURCE_DIR}/ConnectTool/steam
-    ${CMAKE_SOURCE_DIR}/nanoid_cpp/inc
+    ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/steam
+    ${CMAKE_SOURCE_DIR}/net
+    ${CMAKE_SOURCE_DIR}/third_party/nanoid_cpp/inc
     ${CMAKE_SOURCE_DIR}/tun
     ${STEAMWORKS_DIR}/public/steam
 )

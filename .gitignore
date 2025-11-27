@@ -52,7 +52,6 @@ external/
 *.swp
 *.swo
 *.swn
-*.swo
 *~
 
 # OS
@@ -60,5 +59,9 @@ external/
 Thumbs.db
 ehthumbs.db
 
-# Steamworks
+# Steamworks (we use sdk/ directory instead)
 steamworks/
+
+# Root-level dependencies (we use third_party/ instead)
+/imgui/
+/nanoid_cpp/

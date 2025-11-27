@@ -48,13 +48,9 @@ jobs:
         vcpkg install glfw3:x64-windows boost-system:x64-windows
         vcpkg integrate install
 
-    - name: Checkout ImGui
+    - name: Initialize Submodules
       run: |
-        git clone --depth 1 https://github.com/ocornut/imgui.git imgui
-
-    - name: Checkout nanoid_cpp
-      run: |
-        git clone --depth 1 https://github.com/mcmikecreations/nanoid_cpp.git nanoid_cpp
+        git submodule update --init --recursive --depth 1
 
     - name: Check Steamworks SDK
       run: |
