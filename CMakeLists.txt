@@ -8,12 +8,42 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(OpenGL REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(Boost REQUIRED COMPONENTS system)
+find_package(Threads REQUIRED)
 
-# Add ImGui
-add_subdirectory(imgui)
+# ImGui sources (imgui doesn't have CMakeLists.txt by default)
+set(IMGUI_DIR "${CMAKE_SOURCE_DIR}/imgui")
+file(GLOB IMGUI_SOURCES
+    "${IMGUI_DIR}/imgui.cpp"
+    "${IMGUI_DIR}/imgui_demo.cpp"
+    "${IMGUI_DIR}/imgui_draw.cpp"
+    "${IMGUI_DIR}/imgui_tables.cpp"
+    "${IMGUI_DIR}/imgui_widgets.cpp"
+    "${IMGUI_DIR}/backends/imgui_impl_glfw.cpp"
+    "${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp"
+)
+add_library(imgui STATIC ${IMGUI_SOURCES})
+target_include_directories(imgui PUBLIC 
+    ${IMGUI_DIR}
+    ${IMGUI_DIR}/backends
+)
+target_link_libraries(imgui PUBLIC glfw OpenGL::GL)
 
 # Add nanoid_cpp
+set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 add_subdirectory(nanoid_cpp)
+
+# Steamworks SDK path
+set(STEAMWORKS_DIR "${CMAKE_SOURCE_DIR}/sdk")
+
+# Platform-specific Steamworks library
+if(WIN32)
+    set(STEAM_LIB "${STEAMWORKS_DIR}/redistributable_bin/win64/steam_api64.lib")
+elseif(APPLE)
+    set(STEAM_LIB "${STEAMWORKS_DIR}/redistributable_bin/osx/libsteam_api.dylib")
+else()
+    set(STEAM_LIB "${STEAMWORKS_DIR}/redistributable_bin/linux64/libsteam_api.so")
+endif()
 
 # TUN module sources (platform-specific)
 set(TUN_SOURCES
@@ -53,25 +83,70 @@ if(MSVC)
 endif()
 
 # Include directories
-include_directories(${CMAKE_SOURCE_DIR}/ConnectTool)
-include_directories(${CMAKE_SOURCE_DIR}/ConnectTool/net)
-include_directories(${CMAKE_SOURCE_DIR}/ConnectTool/steam)
-include_directories(${CMAKE_SOURCE_DIR}/nanoid_cpp/inc)
-include_directories(${CMAKE_SOURCE_DIR}/tun)
-
-# Include Steamworks
-include_directories(${CMAKE_SOURCE_DIR}/steamworks/public/steam)
+target_include_directories(OnlineGameTool PRIVATE
+    ${CMAKE_SOURCE_DIR}/ConnectTool
+    ${CMAKE_SOURCE_DIR}/ConnectTool/net
+    ${CMAKE_SOURCE_DIR}/ConnectTool/steam
+    ${CMAKE_SOURCE_DIR}/nanoid_cpp/inc
+    ${CMAKE_SOURCE_DIR}/tun
+    ${STEAMWORKS_DIR}/public/steam
+)
 
 # Include Wintun (Windows only)
 if(WIN32)
-    include_directories(${CMAKE_SOURCE_DIR}/third_party/wintun/api)
+    target_include_directories(OnlineGameTool PRIVATE
+        ${CMAKE_SOURCE_DIR}/third_party/wintun/api
+    )
 endif()
 
-# Link libraries
-target_link_libraries(OnlineGameTool PRIVATE imgui nanoid ${CMAKE_SOURCE_DIR}/steamworks/redistributable_bin/win64/steam_api64.lib Boost::system ws2_32)
+# Link libraries - platform specific
+if(WIN32)
+    target_link_libraries(OnlineGameTool PRIVATE 
+        imgui 
+        nanoid 
+        ${STEAM_LIB}
+        Boost::system 
+        ws2_32
+        Threads::Threads
+    )
+elseif(APPLE)
+    target_link_libraries(OnlineGameTool PRIVATE 
+        imgui 
+        nanoid 
+        ${STEAM_LIB}
+        Boost::system
+        Threads::Threads
+    )
+else()
+    target_link_libraries(OnlineGameTool PRIVATE 
+        imgui 
+        nanoid 
+        ${STEAM_LIB}
+        Boost::system
+        Threads::Threads
+    )
+endif()
+
+# Copy Steam API DLL/SO/DYLIB to output directory
+if(WIN32)
+    add_custom_command(TARGET OnlineGameTool POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${STEAMWORKS_DIR}/redistributable_bin/win64/steam_api64.dll"
+        $<TARGET_FILE_DIR:OnlineGameTool>)
+elseif(APPLE)
+    add_custom_command(TARGET OnlineGameTool POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${STEAMWORKS_DIR}/redistributable_bin/osx/libsteam_api.dylib"
+        $<TARGET_FILE_DIR:OnlineGameTool>)
+else()
+    add_custom_command(TARGET OnlineGameTool POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${STEAMWORKS_DIR}/redistributable_bin/linux64/libsteam_api.so"
+        $<TARGET_FILE_DIR:OnlineGameTool>)
+endif()
 
 # Add TUN example executable (optional)
-option(BUILD_TUN_EXAMPLE "Build TUN example program" ON)
+option(BUILD_TUN_EXAMPLE "Build TUN example program" OFF)
 if(BUILD_TUN_EXAMPLE)
     add_executable(TunExample tun/example_tun.cpp ${TUN_SOURCES})
     
