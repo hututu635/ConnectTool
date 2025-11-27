@@ -2,9 +2,9 @@ name: Build and Release
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "tun", "tun-github-action-dev" ]
   pull_request:
-    branches: [ "main", "master" ]
+    branches: [ "tun", "tun-github-action-dev" ]
   workflow_dispatch:
 
 jobs:
