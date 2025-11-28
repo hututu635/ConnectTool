@@ -16,10 +16,18 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
 
-    - name: Install dependencies
+    - name: Install system dependencies for GLFW3
       run: |
         sudo apt-get update
-        sudo apt-get install -y libglfw3-dev libboost-system-dev cmake
+        sudo apt-get install -y \
+          libglfw3-dev \
+          libboost-system-dev \
+          cmake \
+          libxinerama-dev \
+          libxcursor-dev \
+          xorg-dev \
+          libglu1-mesa-dev \
+          pkg-config
 
     - name: Install vcpkg
       run: |
@@ -29,7 +37,7 @@ jobs:
 
     - name: Set up CMake
       run: |
-        sudo apt-get install -y cmake # 确保安装 CMake（如果它尚未安装）
+        sudo apt-get install -y cmake
 
     - name: Configure CMake
       run: |
