@@ -1,0 +1,91 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ "tun", "tun-github-action-dev" ]
+  pull_request:
+    branches: [ "tun", "tun-github-action-dev" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: x64
+            artifact_name: ConnectTool-Windows-x64
+            cmake_args: -A x64
+          - os: ubuntu-latest
+            platform: x64
+            artifact_name: ConnectTool-Linux-x64
+            cmake_args: ""
+          - os: macos-latest
+            platform: arm64
+            artifact_name: ConnectTool-MacOS-arm64
+            cmake_args: ""
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Dependencies (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libglfw3-dev libboost-system-dev libgl1-mesa-dev
+
+    - name: Install Dependencies (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        brew install glfw
+        brew install boost
+
+    - name: Install Dependencies (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        vcpkg install glfw3:x64-windows boost-system:x64-windows
+        vcpkg integrate install
+
+    - name: Initialize Submodules
+      run: |
+        git submodule update --init --recursive --depth 1
+
+    - name: Check Steamworks SDK
+      shell: bash
+      run: |
+        if [ ! -d "sdk" ]; then
+          echo "::error::'sdk' directory not found. Please ensure the Steamworks SDK is present in the 'sdk' folder."
+          exit 1
+        fi
+
+    - name: Configure CMake (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        cmake -G "Visual Studio 17 2022" -B build -S . -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" ${{ matrix.cmake_args }}
+
+    - name: Configure CMake (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        cmake -B build -S . ${{ matrix.cmake_args }}
+
+    - name: Configure CMake (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        cmake -B build -S . -DBoost_NO_BOOST_CMAKE=ON ${{ matrix.cmake_args }}
+
+    - name: Build
+      run: cmake --build build --config Release
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.artifact_name }}
+        path: |
+          build/Release/OnlineGameTool.exe
+          build/Release/steam_api64.dll
+          build/OnlineGameTool
+          build/libsteam_api.so
+          build/libsteam_api.dylib
