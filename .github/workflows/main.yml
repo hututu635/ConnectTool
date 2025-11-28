@@ -1,92 +1,50 @@
-name: Build and Release
+name: Build ConnectTool
 
 on:
   push:
-    branches: [ "tun", "tun-github-action-dev" ]
+    branches:
+      - main
   pull_request:
-    branches: [ "tun", "tun-github-action-dev" ]
-  workflow_dispatch:
+    branches:
+      - main
 
 jobs:
   build:
-    name: Build on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            platform: x64
-            artifact_name: ConnectTool-Windows-x64
-            cmake_args: -A x64
-          - os: ubuntu-latest
-            platform: x64
-            artifact_name: ConnectTool-Linux-x64
-            cmake_args: ""
-          - os: macos-latest
-            platform: arm64
-            artifact_name: ConnectTool-MacOS-arm64
-            cmake_args: ""
-
+    runs-on: ubuntu-latest
+    
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v2
 
-    - name: Install Dependencies (Linux)
-      if: runner.os == 'Linux'
+    - name: Set up CMake
+      uses: triagemd/cmake-action@v2
+      with:
+        cmake-version: '3.19.0'  # 如果你的项目需要更高版本，请更改
+
+    - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y libglfw3-dev libboost-system-dev libgl1-mesa-dev
+        sudo apt-get install -y libglfw3-dev libboost-system-dev cmake
 
-    - name: Install Dependencies (macOS)
-      if: runner.os == 'macOS'
+    - name: Install vcpkg
       run: |
-        brew install glfw
-        brew install boost
+        git clone https://github.com/microsoft/vcpkg.git
+        ./vcpkg/bootstrap-vcpkg.sh
+        ./vcpkg/vcpkg install glfw3 boost-system
 
-    - name: Install Dependencies (Windows)
-      if: runner.os == 'Windows'
+    - name: Configure CMake
       run: |
-        vcpkg install glfw3:x64-windows boost-system:x64-windows
-        vcpkg integrate install
+        mkdir build
+        cd build
+        cmake .. -DCMAKE_TOOLCHAIN_FILE=../vcpkg/scripts/buildsystems/vcpkg.cmake
 
-    - name: Initialize Submodules
+    - name: Build project
       run: |
-      git submodule add https://github.com/mcmikecreations/nanoid_cpp.git nanoid_cpp ｜
-        git submodule update --init --recursive --depth 1
+        cd build
+        cmake --build . --config Release
 
-    - name: Check Steamworks SDK
-      shell: bash
+    - name: Run tests
       run: |
-        if [ ! -d "sdk" ]; then
-          echo "::error::'sdk' directory not found. Please ensure the Steamworks SDK is present in the 'sdk' folder."
-          exit 1
-        fi
+        cd build
+        ./OnlineGameTool  # 你可以根据需要执行测试步骤
 
-    - name: Configure CMake (Windows)
-      if: runner.os == 'Windows'
-      run: |
-        cmake -G "Visual Studio 17 2022" -B build -S . -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" ${{ matrix.cmake_args }}
-
-    - name: Configure CMake (Linux)
-      if: runner.os == 'Linux'
-      run: |
-        cmake -B build -S . ${{ matrix.cmake_args }}
-
-    - name: Configure CMake (macOS)
-      if: runner.os == 'macOS'
-      run: |
-        cmake -B build -S . -DBoost_NO_BOOST_CMAKE=ON ${{ matrix.cmake_args }}
-
-    - name: Build
-      run: cmake --build build --config Release
-
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ matrix.artifact_name }}
-        path: |
-          build/Release/OnlineGameTool.exe
-          build/Release/steam_api64.dll
-          build/OnlineGameTool
-          build/libsteam_api.so
-          build/libsteam_api.dylib
