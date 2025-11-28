@@ -21,7 +21,7 @@ jobs:
           git clone https://github.com/microsoft/vcpkg.git ${{ github.workspace }}/vcpkg
           # Bootstrap vcpkg
           cd ${{ github.workspace }}/vcpkg
-          ./bootstrap-vcpkg.bat
+          .\bootstrap-vcpkg.bat
 
       - name: Install dependencies using vcpkg
         run: |
@@ -31,7 +31,8 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake .. -DCMAKE_TOOLCHAIN_FILE=$${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+          # Use forward slashes for the path
+          cmake .. -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
           cmake --build . --config Release
 
       - name: Run the program
