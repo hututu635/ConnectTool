@@ -30,15 +30,29 @@ jobs:
       # Step 3: Download and extract Steam SDK (if not already available)
       - name: Download Steam SDK
         run: |
-          # If Steam SDK is not yet available, you can download and extract it (example URL, replace with actual link)
-          $steam_sdk_url = "https://partner.steamgames.com/download/steamworks_sdk.zip"
+          $steam_sdk_url = "https://partner.steamgames.com/download/steamworks_sdk.zip"  # Replace with actual SDK URL
           $steam_sdk_path = "${{ github.workspace }}/steamworks_sdk"
           
+          Write-Host "Starting to download Steam SDK from: $steam_sdk_url"
+          
           # Download Steam SDK
-          Invoke-WebRequest -Uri $steam_sdk_url -OutFile "$steam_sdk_path.zip"
+          try {
+            Invoke-WebRequest -Uri $steam_sdk_url -OutFile "$steam_sdk_path.zip"
+            Write-Host "Steam SDK downloaded successfully."
+          } catch {
+            Write-Host "Error downloading Steam SDK: $_"
+            exit 1
+          }
           
           # Unzip the SDK
-          Expand-Archive -Path "$steam_sdk_path.zip" -DestinationPath $steam_sdk_path
+          try {
+            Write-Host "Extracting Steam SDK..."
+            Expand-Archive -Path "$steam_sdk_path.zip" -DestinationPath $steam_sdk_path
+            Write-Host "Steam SDK extracted successfully."
+          } catch {
+            Write-Host "Error extracting Steam SDK: $_"
+            exit 1
+          }
           
           # Optionally, move the SDK files to a more convenient path
           move-item "$steam_sdk_path" "${{ github.workspace }}/steamworks" -Force
