@@ -15,25 +15,43 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Set up vcpkg manually
+      # Step 1: Set up vcpkg (Install dependencies like Boost)
+      - name: Set up vcpkg
         run: |
-          # Clone vcpkg repository
           git clone https://github.com/microsoft/vcpkg.git ${{ github.workspace }}/vcpkg
-          # Bootstrap vcpkg
           cd ${{ github.workspace }}/vcpkg
           .\bootstrap-vcpkg.bat
 
-      - name: Install dependencies using vcpkg
+      # Step 2: Install dependencies using vcpkg
+      - name: Install dependencies with vcpkg
         run: |
           .\vcpkg\vcpkg install glfw3 boost-system
 
-      - name: Configure and build
+      # Step 3: Download and extract Steam SDK (if not already available)
+      - name: Download Steam SDK
+        run: |
+          # If Steam SDK is not yet available, you can download and extract it (example URL, replace with actual link)
+          $steam_sdk_url = "https://partner.steamgames.com/download/steamworks_sdk.zip"
+          $steam_sdk_path = "${{ github.workspace }}/steamworks_sdk"
+          
+          # Download Steam SDK
+          Invoke-WebRequest -Uri $steam_sdk_url -OutFile "$steam_sdk_path.zip"
+          
+          # Unzip the SDK
+          Expand-Archive -Path "$steam_sdk_path.zip" -DestinationPath $steam_sdk_path
+          
+          # Optionally, move the SDK files to a more convenient path
+          move-item "$steam_sdk_path" "${{ github.workspace }}/steamworks" -Force
+
+      # Step 4: Build the project using CMake
+      - name: Build with CMake
         run: |
           mkdir build
           cd build
           cmake .. -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
           cmake --build . --config Release
 
-      - name: Run the program
+      # Step 5: Run the program (assuming the build was successful)
+      - name: Run OnlineGameTool
         run: |
           .\Release\OnlineGameTool.exe
