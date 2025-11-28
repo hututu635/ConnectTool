@@ -1,4 +1,4 @@
-name: Build ConnectTool
+name: Build and Test OnlineGameTool
 
 on:
   push:
@@ -9,48 +9,71 @@ on:
       - main
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-
+  build-windows:
+    runs-on: windows-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v2
 
-    - name: Install system dependencies for GLFW3
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          libglfw3-dev \
-          libboost-system-dev \
-          cmake \
-          libxinerama-dev \
-          libxcursor-dev \
-          xorg-dev \
-          libglu1-mesa-dev \
-          pkg-config
+      - name: Set up vcpkg
+        uses: lukechilds/vcpkg-action@v11
+        with:
+          vcpkgDirectory: ${{ github.workspace }}/vcpkg
 
-    - name: Install vcpkg
-      run: |
-        git clone https://github.com/microsoft/vcpkg.git
-        ./vcpkg/bootstrap-vcpkg.sh
-        ./vcpkg/vcpkg install glfw3 boost-system
+      - name: Install dependencies
+        run: |
+          .\vcpkg\vcpkg install glfw3 boost-system
 
-    - name: Set up CMake
-      run: |
-        sudo apt-get install -y cmake
+      - name: Configure and build
+        run: |
+          mkdir build
+          cd build
+          cmake .. -DCMAKE_TOOLCHAIN_FILE=$${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+          cmake --build . --config Release
 
-    - name: Configure CMake
-      run: |
-        mkdir build
-        cd build
-        cmake .. -DCMAKE_TOOLCHAIN_FILE=../vcpkg/scripts/buildsystems/vcpkg.cmake
+      - name: Run the program
+        run: |
+          .\Release\OnlineGameTool.exe
 
-    - name: Build project
-      run: |
-        cd build
-        cmake --build . --config Release
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
 
-    - name: Run tests
-      run: |
-        cd build
-        ./OnlineGameTool  # 你可以根据需要执行测试步骤
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y libglfw3-dev libboost-system-dev
+
+      - name: Configure and build
+        run: |
+          mkdir build
+          cd build
+          cmake ..
+          make
+
+      - name: Run the program
+        run: |
+          ./OnlineGameTool
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: |
+          brew install glfw boost
+
+      - name: Configure and build
+        run: |
+          mkdir build
+          cd build
+          cmake ..
+          make
+
+      - name: Run the program
+        run: |
+          ./OnlineGameTool
