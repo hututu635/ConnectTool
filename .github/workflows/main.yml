@@ -31,53 +31,9 @@ jobs:
         run: |
           mkdir build
           cd build
-          # Use forward slashes for the path
           cmake .. -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
           cmake --build . --config Release
 
       - name: Run the program
         run: |
           .\Release\OnlineGameTool.exe
-
-  build-linux:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-
-      - name: Install dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y libglfw3-dev libboost-system-dev
-
-      - name: Configure and build
-        run: |
-          mkdir build
-          cd build
-          cmake ..
-          make
-
-      - name: Run the program
-        run: |
-          ./OnlineGameTool
-
-  build-macos:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-
-      - name: Install dependencies
-        run: |
-          brew install glfw boost
-
-      - name: Configure and build
-        run: |
-          mkdir build
-          cd build
-          cmake ..
-          make
-
-      - name: Run the program
-        run: |
-          ./OnlineGameTool
