@@ -11,15 +11,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v2
-
-    - name: Set up CMake
-      uses: cmake/setup-cmake@v3
-      with:
-        cmake-version: '3.19.0'  # 如果你的项目需要更高版本，请更改
 
     - name: Install dependencies
       run: |
@@ -31,6 +26,10 @@ jobs:
         git clone https://github.com/microsoft/vcpkg.git
         ./vcpkg/bootstrap-vcpkg.sh
         ./vcpkg/vcpkg install glfw3 boost-system
+
+    - name: Set up CMake
+      run: |
+        sudo apt-get install -y cmake # 确保安装 CMake（如果它尚未安装）
 
     - name: Configure CMake
       run: |
