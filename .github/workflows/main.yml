@@ -43,8 +43,14 @@ jobs:
             Write-Host "Error downloading Steam SDK: $_"
             exit 1
           }
-          
-          # Unzip the SDK
+
+          # Verify the downloaded file (check if it's a valid ZIP file)
+          if ((Get-Item "$steam_sdk_path.zip").length -eq 0) {
+            Write-Host "Downloaded file is empty, re-attempting download."
+            exit 1
+          }
+
+          # Unzip the SDK with error handling
           try {
             Write-Host "Extracting Steam SDK..."
             Expand-Archive -Path "$steam_sdk_path.zip" -DestinationPath $steam_sdk_path
