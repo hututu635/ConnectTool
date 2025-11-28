@@ -51,6 +51,7 @@ jobs:
 
     - name: Initialize Submodules
       run: |
+      git submodule add https://github.com/mcmikecreations/nanoid_cpp.git nanoid_cpp ｜
         git submodule update --init --recursive --depth 1
 
     - name: Check Steamworks SDK
