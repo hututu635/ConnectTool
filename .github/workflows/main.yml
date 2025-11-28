@@ -17,7 +17,7 @@ jobs:
       uses: actions/checkout@v2
 
     - name: Set up CMake
-      uses: triagemd/cmake-action@v2
+      uses: cmake/setup-cmake@v3
       with:
         cmake-version: '3.19.0'  # 如果你的项目需要更高版本，请更改
 
@@ -47,4 +47,3 @@ jobs:
       run: |
         cd build
         ./OnlineGameTool  # 你可以根据需要执行测试步骤
-
